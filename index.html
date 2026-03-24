@@ -1,0 +1,1161 @@
+<!DOCTYPE html>
+<html lang="de">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Stundenplan-Planer – VR-optimiert V2</title>
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700&display=swap');
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: 'Outfit', sans-serif;
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      min-height: 100vh;
+      padding: 20px;
+      color: #1a202c;
+      -webkit-user-select: none;
+      user-select: none;
+    }
+
+    /* ============================================================
+       BLUR OVERLAY & START BUTTON
+    ============================================================ */
+    #startOverlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9999;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      background: rgba(102, 126, 234, 0.35);
+      transition: opacity 0.6s ease;
+    }
+
+    #startOverlay.hidden {
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .start-card {
+      background: rgba(255, 255, 255, 0.95);
+      border-radius: 28px;
+      padding: 56px 64px;
+      text-align: center;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.35);
+      max-width: 520px;
+      width: 90%;
+      animation: cardIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    @keyframes cardIn {
+      from { transform: scale(0.8) translateY(30px); opacity: 0; }
+      to   { transform: scale(1) translateY(0);     opacity: 1; }
+    }
+
+    .start-card .icon {
+      font-size: 4rem;
+      margin-bottom: 20px;
+      display: block;
+    }
+
+    .start-card h2 {
+      font-size: 1.9rem;
+      font-weight: 700;
+      color: #2d3748;
+      margin-bottom: 12px;
+    }
+
+    .start-card p {
+      font-size: 1rem;
+      color: #718096;
+      line-height: 1.7;
+      margin-bottom: 36px;
+    }
+
+    #startBtn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 18px 56px;
+      border-radius: 16px;
+      font-size: 1.2rem;
+      font-weight: 700;
+      cursor: pointer;
+      font-family: 'Outfit', sans-serif;
+      box-shadow: 0 8px 24px rgba(102, 126, 234, 0.45);
+      transition: all 0.3s ease;
+      min-width: 48px;
+      min-height: 48px;
+    }
+
+    #startBtn:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 32px rgba(102, 126, 234, 0.6);
+    }
+
+    #startBtn:active { transform: translateY(0); }
+
+    /* ============================================================
+       MAIN LAYOUT
+    ============================================================ */
+    .container {
+      max-width: 1600px;
+      margin: 0 auto;
+      background: rgba(255, 255, 255, 0.98);
+      border-radius: 24px;
+      box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
+      overflow: hidden;
+    }
+
+    header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 32px 40px;
+      position: relative;
+      overflow: hidden;
+    }
+
+    header::before {
+      content: '';
+      position: absolute;
+      top: -50%; right: -50%;
+      width: 200%; height: 200%;
+      background: radial-gradient(circle, rgba(255,255,255,0.1) 0%, transparent 70%);
+      animation: pulse 15s infinite;
+    }
+
+    @keyframes pulse {
+      0%, 100% { transform: translate(0, 0) scale(1); }
+      50%       { transform: translate(-10%, -10%) scale(1.1); }
+    }
+
+    .header-instructions {
+      font-size: 1rem;
+      font-weight: 400;
+      line-height: 1.8;
+      opacity: 0.97;
+      position: relative;
+      z-index: 1;
+    }
+
+    .subtitle {
+      font-size: 1rem;
+      opacity: 0.85;
+      font-weight: 300;
+      position: relative;
+      z-index: 1;
+      margin-top: 6px;
+    }
+
+    .controls {
+      padding: 24px 40px;
+      background: #f7fafc;
+      border-bottom: 2px solid #e2e8f0;
+      display: flex;
+      gap: 16px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    button {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      border: none;
+      padding: 12px 28px;
+      border-radius: 12px;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 4px 12px rgba(102, 126, 234, 0.3);
+      font-family: 'Outfit', sans-serif;
+      min-width: 48px;
+      min-height: 48px;
+    }
+
+    button:hover { transform: translateY(-2px); box-shadow: 0 6px 20px rgba(102, 126, 234, 0.4); }
+    button:active { transform: translateY(0); }
+    button.secondary { background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%); }
+
+    .info {
+      margin-left: auto;
+      padding: 10px 20px;
+      background: white;
+      border-radius: 10px;
+      font-weight: 500;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      font-size: 0.9rem;
+    }
+
+    .main-content {
+      display: grid;
+      grid-template-columns: 320px 1fr;
+      gap: 0;
+      min-height: 600px;
+    }
+
+    .sidebar {
+      background: #f7fafc;
+      padding: 24px;
+      border-right: 2px solid #e2e8f0;
+      overflow-y: auto;
+      max-height: calc(100vh - 300px);
+    }
+
+    .sidebar h2 { font-size: 1.3rem; margin-bottom: 16px; color: #2d3748; font-weight: 600; }
+
+    .task-item {
+      background: white;
+      border: 3px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 14px;
+      margin-bottom: 12px;
+      cursor: pointer;
+      transition: all 0.3s ease;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.05);
+      position: relative;
+    }
+
+    .task-item:hover { transform: translateY(-2px); box-shadow: 0 4px 12px rgba(0,0,0,0.1); border-color: #667eea; }
+    .task-item:active { transform: scale(0.98); }
+
+    .task-item.selected {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-color: #667eea;
+      color: white;
+      transform: scale(1.05);
+      box-shadow: 0 8px 20px rgba(102, 126, 234, 0.5);
+      animation: pulse-select 1s ease-in-out infinite;
+    }
+
+    @keyframes pulse-select {
+      0%, 100% { box-shadow: 0 8px 20px rgba(102, 126, 234, 0.5); }
+      50%       { box-shadow: 0 8px 30px rgba(102, 126, 234, 0.8); }
+    }
+
+    .task-item.selected .task-title,
+    .task-item.selected .task-meta,
+    .task-item.selected .task-duration,
+    .task-item.selected .task-deadline { color: white !important; }
+
+    .task-item.completed {
+      opacity: 0.5;
+      background: #e6ffed;
+      border-color: #9ae6b4;
+      cursor: default;
+      pointer-events: none;
+    }
+
+    .task-item.completed::after {
+      content: attr(data-scheduled-text);
+      display: block;
+      color: #22543d;
+      font-size: 0.85rem;
+      font-weight: 600;
+      margin-top: 6px;
+    }
+
+    .task-title { font-weight: 600; color: #2d3748; margin-bottom: 6px; font-size: 0.95rem; }
+    .task-meta  { font-size: 0.85rem; color: #718096; display: flex; flex-direction: column; gap: 4px; }
+    .task-duration { color: #667eea; font-weight: 600; }
+    .task-deadline { color: #f56565; font-weight: 500; }
+
+    .calendar { padding: 24px; overflow-x: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: separate;
+      border-spacing: 0;
+      background: white;
+      border-radius: 12px;
+      overflow: hidden;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+      table-layout: fixed;
+    }
+
+    thead th {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 16px 12px;
+      font-weight: 600;
+      text-align: center;
+      font-size: 1rem;
+      position: sticky;
+      top: 0;
+      z-index: 10;
+    }
+
+    thead th:first-child { border-top-left-radius: 12px; width: 120px; }
+    thead th:last-child  { border-top-right-radius: 12px; }
+
+    tbody th {
+      background: #edf2f7;
+      padding: 12px;
+      font-weight: 600;
+      font-size: 0.85rem;
+      text-align: center;
+      border-right: 2px solid #e2e8f0;
+      border-bottom: 1px solid #e2e8f0;
+      color: #4a5568;
+      width: 120px;
+    }
+
+    td {
+      border: 1px solid #e2e8f0;
+      padding: 8px;
+      vertical-align: top;
+      min-height: 80px;
+      height: 80px;
+      position: relative;
+      background: white;
+      transition: all 0.3s ease;
+    }
+
+    /* Wenn eine Aufgabe drin ist → Zelle wächst, zeigt Platz für zweite 20min-Aufgabe */
+    td.free.has-task {
+      min-height: 200px;
+      height: auto;
+    }
+
+    /* Visueller Hinweis: freier Bereich unten in der Zelle */
+    td.free.has-task::after {
+      content: var(--free-slot-hint, '+ weitere Aufgabe möglich');
+      display: block;
+      margin-top: 8px;
+      padding: 10px;
+      border: 2px dashed #6ee7b7;
+      border-radius: 8px;
+      text-align: center;
+      font-size: 0.75rem;
+      font-weight: 600;
+      color: #059669;
+      background: rgba(209, 250, 229, 0.5);
+      pointer-events: none;
+    }
+
+    tr.break-row th, tr.break-row td {
+      height: 8px; min-height: 8px; padding: 0;
+      background: #e2e8f0; border: none;
+    }
+
+    td.blocked { background: #f7fafc; position: relative; }
+    td.blocked::after {
+      content: attr(data-subject);
+      position: absolute;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      font-size: 0.8rem; color: #4a5568; font-weight: 600;
+      text-align: center; width: 90%;
+    }
+
+    td.free { background: #d1fae5; cursor: pointer; }
+    td.free:hover { background: #a7f3d0; transform: scale(1.02); }
+
+    td.free.drop-target {
+      background: #bfdbfe;
+      outline: 4px solid #3b82f6;
+      outline-offset: -8px;
+      animation: pulse-drop 0.8s ease-in-out infinite;
+    }
+
+    @keyframes pulse-drop {
+      0%, 100% { outline-color: #3b82f6; transform: scale(1); }
+      50%       { outline-color: #60a5fa; transform: scale(1.03); }
+    }
+
+    .scheduled-task {
+      background: #f7fafc;
+      border: 2px solid #cbd5e0;
+      border-radius: 8px;
+      padding: 10px;
+      margin-bottom: 6px;
+      font-size: 0.85rem;
+      cursor: pointer;
+      transition: all 0.2s ease;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.1);
+      position: relative;
+    }
+
+    .scheduled-task:hover { transform: scale(1.02); box-shadow: 0 4px 12px rgba(0,0,0,0.15); border-color: #667eea; }
+    .scheduled-task:active { transform: scale(0.98); }
+
+    .scheduled-task.selected {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      border-color: #667eea; color: white;
+      transform: scale(1.05);
+      box-shadow: 0 8px 20px rgba(102, 126, 234, 0.5);
+    }
+
+    .scheduled-task.selected .scheduled-task-title,
+    .scheduled-task.selected .scheduled-task-duration { color: white !important; }
+
+    .scheduled-task-title   { font-weight: 600; color: #2d3748; margin-bottom: 4px; }
+    .scheduled-task-duration { font-size: 0.75rem; color: #4a5568; font-weight: 500; }
+
+    .delete-btn {
+      position: absolute; top: 4px; right: 4px;
+      background: #fc8181; color: white; border: none;
+      border-radius: 50%; width: 28px; height: 28px;
+      cursor: pointer; font-size: 0.9rem;
+      display: flex; align-items: center; justify-content: center;
+      padding: 0; box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      transition: all 0.2s; z-index: 10;
+      min-width: 28px; min-height: 28px;
+    }
+
+    .delete-btn:hover { background: #f56565; transform: scale(1.15); }
+    .delete-btn:active { transform: scale(0.95); }
+
+    .documentation {
+      background: white;
+      margin: 0 40px 20px 40px;
+      border-radius: 12px;
+      padding: 24px;
+      box-shadow: 0 4px 16px rgba(0,0,0,0.08);
+    }
+
+    .doc-content h3 { color: #2d3748; margin-bottom: 20px; font-size: 1.5rem; }
+    .doc-section h4 { color: #4a5568; margin-top: 16px; margin-bottom: 8px; font-size: 1.1rem; }
+    .doc-section p  { color: #718096; line-height: 1.6; margin-bottom: 12px; }
+    .doc-section ul { list-style: none; padding-left: 0; color: #718096; line-height: 1.8; }
+    .doc-section li { padding-left: 20px; position: relative; margin-bottom: 8px; }
+    .doc-section li::before { content: '▸'; position: absolute; left: 0; color: #667eea; font-weight: bold; }
+    .doc-section strong { color: #2d3748; font-weight: 600; }
+
+    .copyright {
+      margin-top: 24px; padding-top: 16px;
+      border-top: 2px solid #e2e8f0;
+      text-align: center;
+    }
+
+    .copyright p { color: #4a5568; font-size: 0.9rem; margin: 4px 0; font-weight: 500; }
+
+    @media (max-width: 1200px) {
+      .main-content { grid-template-columns: 1fr; }
+      .sidebar { border-right: none; border-bottom: 2px solid #e2e8f0; max-height: 400px; }
+    }
+
+    /* ============================================================
+       TIMER
+    ============================================================ */
+    #timerWidget {
+      display: flex;
+      align-items: center;
+      gap: 12px;
+      background: white;
+      border-radius: 14px;
+      padding: 10px 20px;
+      box-shadow: 0 2px 8px rgba(0,0,0,0.08);
+      font-weight: 600;
+      font-size: 1rem;
+      transition: background 0.4s, color 0.4s;
+      min-width: 170px;
+      justify-content: center;
+    }
+
+    #timerWidget.warning {
+      background: linear-gradient(135deg, #fef3c7, #fde68a);
+      color: #92400e;
+    }
+
+    #timerWidget.danger {
+      background: linear-gradient(135deg, #fee2e2, #fca5a5);
+      color: #991b1b;
+      animation: timer-pulse 0.8s ease-in-out infinite;
+    }
+
+    @keyframes timer-pulse {
+      0%, 100% { box-shadow: 0 2px 8px rgba(239,68,68,0.3); }
+      50%       { box-shadow: 0 4px 20px rgba(239,68,68,0.6); }
+    }
+
+    #timerWidget.finished {
+      background: linear-gradient(135deg, #d1fae5, #6ee7b7);
+      color: #065f46;
+    }
+
+    .timer-icon { font-size: 1.3rem; }
+
+    #timerDisplay {
+      font-size: 1.4rem;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: 0.04em;
+      min-width: 60px;
+      text-align: center;
+    }
+
+    /* Circular SVG progress ring */
+    .timer-ring-wrap {
+      position: relative;
+      width: 48px;
+      height: 48px;
+      flex-shrink: 0;
+    }
+
+    .timer-ring-wrap svg {
+      transform: rotate(-90deg);
+    }
+
+    .timer-ring-bg  { fill: none; stroke: #e2e8f0; stroke-width: 4; }
+    .timer-ring-bar {
+      fill: none;
+      stroke: #667eea;
+      stroke-width: 4;
+      stroke-linecap: round;
+      transition: stroke-dashoffset 1s linear, stroke 0.4s;
+    }
+
+    #timerWidget.warning .timer-ring-bar { stroke: #d97706; }
+    #timerWidget.danger  .timer-ring-bar { stroke: #dc2626; }
+    #timerWidget.finished .timer-ring-bar { stroke: #059669; }
+
+    .timer-ring-text {
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.7rem;
+      font-weight: 700;
+      color: #4a5568;
+    }
+
+    /* Time-up overlay */
+    #timeUpOverlay {
+      position: fixed;
+      inset: 0;
+      z-index: 9998;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      background: rgba(220, 38, 38, 0.25);
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.5s ease;
+    }
+
+    #timeUpOverlay.visible {
+      opacity: 1;
+      pointer-events: all;
+    }
+
+    .time-up-card {
+      background: white;
+      border-radius: 28px;
+      padding: 52px 60px;
+      text-align: center;
+      box-shadow: 0 32px 80px rgba(0,0,0,0.3);
+      max-width: 440px;
+      width: 90%;
+      animation: cardIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+    }
+
+    .time-up-card .icon { font-size: 3.5rem; margin-bottom: 16px; display: block; }
+    .time-up-card h2   { font-size: 1.8rem; font-weight: 700; color: #2d3748; margin-bottom: 10px; }
+    .time-up-card p    { color: #718096; font-size: 1rem; line-height: 1.6; margin-bottom: 32px; }
+
+    #dismissBtn {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white; border: none;
+      padding: 16px 48px;
+      border-radius: 14px;
+      font-size: 1.1rem; font-weight: 700;
+      cursor: pointer; font-family: 'Outfit', sans-serif;
+      box-shadow: 0 8px 20px rgba(102,126,234,0.4);
+      min-width: 48px; min-height: 48px;
+      transition: all 0.3s;
+    }
+    #dismissBtn:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(102,126,234,0.55); }
+  </style>
+</head>
+<body>
+
+  <!-- ============================================================
+       BLUR OVERLAY
+  ============================================================ -->
+  <div id="startOverlay">
+    <div class="start-card">
+      <button id="startBtn" onclick="startApp()">▶ Start</button>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       TIME-UP OVERLAY
+  ============================================================ -->
+  <div id="timeUpOverlay">
+    <div class="time-up-card">
+      <span class="icon">⏰</span>
+      <h2 id="timeUpTitle">Zeit abgelaufen!</h2>
+      <p id="timeUpText">Die 8 Minuten sind um. Bitte legen Sie Ihren Stift nieder.</p>
+      <button id="dismissBtn" onclick="dismissTimeUp()">OK</button>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       MAIN APP
+  ============================================================ -->
+  <div class="container">
+    <header>
+      <p class="header-instructions" id="headerInstructions"></p>
+      <p class="subtitle"><span data-de="Click-to-Select für VR-Headsets" data-en="Click-to-Select for VR headsets">Click-to-Select für VR-Headsets</span></p>
+    </header>
+
+    <div class="controls">
+      <button class="secondary" onclick="toggleLanguage()">🌐 <span id="langToggle">EN</span></button>
+      <div class="info" id="statusInfo"><span data-de="1️⃣ Aufgabe anklicken → 2️⃣ Freies Feld anklicken" data-en="1️⃣ Click task → 2️⃣ Click free field"></span></div>
+
+      <!-- TIMER -->
+      <div id="timerWidget">
+        <div class="timer-ring-wrap">
+          <svg width="48" height="48" viewBox="0 0 48 48">
+            <circle class="timer-ring-bg"  cx="24" cy="24" r="20"/>
+            <circle class="timer-ring-bar" id="timerRingBar" cx="24" cy="24" r="20"
+                    stroke-dasharray="125.66" stroke-dashoffset="0"/>
+          </svg>
+          <div class="timer-ring-text" id="timerRingText">8</div>
+        </div>
+        <span id="timerDisplay">08:00</span>
+      </div>
+    </div>
+
+    <div class="documentation" id="documentation" style="display: none;">
+      <div class="doc-content">
+        <h3>📖 Dokumentation</h3>
+        <div class="doc-section" data-lang="de">
+          <h4>Funktionsweise (VR-optimiert V2)</h4>
+          <p>Diese Version nutzt ein <strong>Click-to-Select</strong> System, das perfekt für VR-Controller funktioniert.</p>
+          <h4>Anleitung</h4>
+          <ul>
+            <li><strong>Schritt 1:</strong> Klicke auf eine Aufgabe in der linken Liste (wird blau markiert)</li>
+            <li><strong>Schritt 2:</strong> Klicke auf ein grünes "Frei"-Feld im Kalender</li>
+            <li><strong>Fertig!</strong> Die Aufgabe wird automatisch eingeplant</li>
+            <li><strong>Aufgabe verschieben:</strong> Klicke auf eingeplante Aufgabe → klicke auf neues Feld</li>
+            <li><strong>Aufgabe löschen:</strong> Klicke auf das rote X</li>
+            <li><strong>Auswahl abbrechen:</strong> Klicke erneut auf die ausgewählte Aufgabe</li>
+          </ul>
+          <h4>Regeln</h4>
+          <ul>
+            <li>Nur „Frei"-Felder (grün) können genutzt werden</li>
+            <li>Mehrstündige Aufgaben werden automatisch verteilt</li>
+            <li>Blockierte Felder (grau) sind für Unterricht reserviert</li>
+            <li>Die Bearbeitungszeit einer Aufgabe darf nicht aufgeteilt werden</li>
+          </ul>
+        </div>
+        <div class="doc-section" data-lang="en" style="display:none;">
+          <h4>How it works (VR-optimized V2)</h4>
+          <p>This version uses a <strong>Click-to-Select</strong> system that works perfectly with VR controllers.</p>
+          <h4>Instructions</h4>
+          <ul>
+            <li><strong>Step 1:</strong> Click on a task in the left list (it will be highlighted blue)</li>
+            <li><strong>Step 2:</strong> Click on a green "Free" field in the calendar</li>
+            <li><strong>Done!</strong> The task is automatically scheduled</li>
+            <li><strong>Move task:</strong> Click on a scheduled task → click on a new field</li>
+            <li><strong>Delete task:</strong> Click on the red X</li>
+            <li><strong>Cancel selection:</strong> Click again on the selected task</li>
+          </ul>
+          <h4>Rules</h4>
+          <ul>
+            <li>Only "Free" fields (green) can be used</li>
+            <li>Multi-hour tasks are automatically distributed</li>
+            <li>Blocked fields (gray) are reserved for classes</li>
+            <li>The processing time for a task may not be split up</li>
+          </ul>
+        </div>
+        <div class="copyright">
+          <p>© 2025 Patrick Lanham | VR-optimierte Version V2 für Forschungszwecke</p>
+          <p>© 2025 Patrick Lanham | VR-optimized version V2 for research purposes</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="main-content">
+      <aside class="sidebar">
+        <h2>📋 <span data-de="Hausaufgaben" data-en="Homework">Hausaufgaben</span></h2>
+        <div id="taskList"></div>
+      </aside>
+      <section class="calendar">
+        <table id="timetable">
+          <thead>
+            <tr>
+              <th><span data-de="Zeit" data-en="Time">Zeit</span></th>
+              <th><span data-de="Montag" data-en="Monday">Montag</span></th>
+              <th><span data-de="Dienstag" data-en="Tuesday">Dienstag</span></th>
+              <th><span data-de="Mittwoch" data-en="Wednesday">Mittwoch</span></th>
+              <th><span data-de="Donnerstag" data-en="Thursday">Donnerstag</span></th>
+              <th><span data-de="Freitag" data-en="Friday">Freitag</span></th>
+            </tr>
+          </thead>
+          <tbody id="timetableBody"></tbody>
+        </table>
+      </section>
+    </div>
+  </div>
+
+  <script>
+    let currentLang = 'de';
+
+    // ── Overlay ──────────────────────────────────────────────────
+    function startApp() {
+      const overlay = document.getElementById('startOverlay');
+      overlay.classList.add('hidden');
+      setTimeout(() => overlay.style.display = 'none', 600);
+      startTimer();
+    }
+
+    // ── Translations ─────────────────────────────────────────────
+    const translations = {
+      headerInstructions: {
+        de: 'Sie erhalten 15 Hausaufgaben, jeweils mit Abgabefrist zur nächsten Unterrichtsstunde. Hausaufgaben dürfen nur in den Stunden mit Kennzeichnung „frei" erledigt werden. In einem freien Slot können mehrere Hausaufgaben erledigt werden, sofern die Zeit ausreicht. Wie lange eine Hausaufgabe dauert und wann die Abgabe ist, steht links neben dem Stundenplan. Die Bearbeitungszeit einer Aufgabe darf nicht aufgeteilt werden. Die Hausaufgabenchips werden auf dem Stundenplan verteilt.',
+        en: 'You will receive 15 homework assignments, each with a deadline for the next class. Homework may only be completed during lessons marked as "free." Several homework assignments can be completed in a free slot, provided there is enough time. How long homework takes and when it is due is indicated to the left of the timetable. The processing time for a task may not be split up. The homework chips are distributed according to the timetable.'
+      },
+      overlayTitle: {
+        de: 'Stundenplan-Planer',
+        en: 'Timetable Planner'
+      },
+      overlayText: {
+        de: 'Sie erhalten 15 Hausaufgaben, jeweils mit Abgabefrist zur nächsten Unterrichtsstunde.<br><br>Verteilen Sie Ihre Hausaufgaben auf die freien Slots im Stundenplan – klicken Sie auf <strong>Start</strong>, um zu beginnen.',
+        en: 'You will receive 15 homework assignments, each with a deadline for the next class.<br><br>Distribute your homework across the free slots in the timetable – click <strong>Start</strong> to begin.'
+      },
+      startBtn: { de: '▶ Start', en: '▶ Start' },
+      days: {
+        de: ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag'],
+        en: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
+      },
+      subjects: {
+        de: {
+          'Mathematik': 'Mathematik', 'Biologie': 'Biologie', 'Physik': 'Physik',
+          'Geographie': 'Geographie', 'Religion': 'Religion', 'Englisch': 'Englisch',
+          'Chemie': 'Chemie', 'Kunst': 'Kunst', 'Spanisch': 'Spanisch',
+          'Sozialkunde': 'Sozialkunde', 'Geschichte': 'Geschichte', 'Deutsch': 'Deutsch',
+          'Frei': 'Frei', 'Informatik': 'Informatik', 'Wahlfach': 'Wahlfach',
+          'Sport': 'Sport', 'Musik': 'Musik'
+        },
+        en: {
+          'Mathematik': 'Mathematics', 'Biologie': 'Biology', 'Physik': 'Physics',
+          'Geographie': 'Geography', 'Religion': 'Religion', 'Englisch': 'English',
+          'Chemie': 'Chemistry', 'Kunst': 'Art', 'Spanisch': 'Spanish',
+          'Sozialkunde': 'Social Studies', 'Geschichte': 'History', 'Deutsch': 'German',
+          'Frei': 'Free', 'Informatik': 'Computer Sc.', 'Wahlfach': 'Elective',
+          'Sport': 'Sports', 'Musik': 'Music'
+        }
+      },
+      deadlines: {
+        de: {
+          'Montag': 'Montag', 'Dienstag': 'Dienstag', 'Mittwoch': 'Mittwoch',
+          'Donnerstag': 'Donnerstag', 'Freitag': 'Freitag',
+          'nächster Montag': 'nächster Montag'
+        },
+        en: {
+          'Montag': 'Monday', 'Dienstag': 'Tuesday', 'Mittwoch': 'Wednesday',
+          'Donnerstag': 'Thursday', 'Freitag': 'Friday',
+          'nächster Montag': 'next Monday'
+        }
+      },
+      taskNames: {
+        de: [
+          'Mathe – Übungsblatt Ableitungen',
+          'Englisch – Vokabeltest',
+          'Geschichte – Quellenanalyse',
+          'Physik – Experimentprotokoll',
+          'Chemie – Reaktionsgleichungen lernen',
+          'Deutsch – Aufsatz „Medienwelten"',
+          'Biologie – Zellbiologie wiederholen',
+          'Spanisch – Grammatikblatt',
+          'Kunst – Skizze',
+          'Informatik – Python-Übung',
+          'Geographie – Klimazonen',
+          'Musik – Liedtext analysieren',
+          'Religion – Reflexion',
+          'Sozialkunde – Politik-Dossier lesen',
+          'Wahlfach – Projektarbeit'
+        ],
+        en: [
+          'Math – Derivatives worksheet',
+          'English – Vocabulary test',
+          'History – Source analysis',
+          'Physics – Experiment report',
+          'Chemistry – Learn reaction equations',
+          'German – Essay "Media worlds"',
+          'Biology – Review cell biology',
+          'Spanish – Grammar sheet',
+          'Art – Sketch',
+          'Computer Sc. – Python exercise',
+          'Geography – Climate zones',
+          'Music – Analyze song lyrics',
+          'Religion – Reflection',
+          'Social Studies – Read politics dossier',
+          'Elective – Project work'
+        ]
+      },
+      messages: {
+        scheduled:     { de: '✓ Eingeplant',  en: '✓ Scheduled' },
+        minutes:       { de: 'Minuten',        en: 'minutes' },
+        min:           { de: 'Min',            en: 'min' },
+        deadline:      { de: 'Deadline',       en: 'Deadline' },
+        notEnoughSlots:{ de: 'Nicht genug aufeinanderfolgende freie Zeitslots verfügbar!', en: 'Not enough consecutive free time slots available!' },
+        taskSelected:  { de: 'Aufgabe ausgewählt! Jetzt freies Feld anklicken', en: 'Task selected! Now click on a free field' },
+        clickToSelect: { de: '1️⃣ Aufgabe anklicken → 2️⃣ Freies Feld anklicken', en: '1️⃣ Click task → 2️⃣ Click free field' }
+      }
+    };
+
+    // ── Schedule (updated: Donnerstag = Spanisch, not Französisch) ─
+    const schedule = {
+      'Montag':     ['Mathematik', 'Mathematik', 'Englisch',   'Englisch',   'Geschichte', 'Geschichte', 'Frei',       'Frei',       'Sport',    'Sport'],
+      'Dienstag':   ['Biologie',   'Biologie',   'Chemie',     'Chemie',     'Deutsch',    'Deutsch',    'Frei',       'Frei',       'Frei',     'Frei'],
+      'Mittwoch':   ['Physik',     'Physik',     'Kunst',      'Kunst',      'Frei',       'Frei',       'Mathematik', 'Mathematik', 'Frei',     'Frei'],
+      'Donnerstag': ['Geographie', 'Geographie', 'Spanisch',   'Spanisch',   'Deutsch',    'Deutsch',    'Informatik', 'Informatik', 'Frei',     'Frei'],
+      'Freitag':    ['Religion',   'Religion',   'Sozialkunde','Sozialkunde','Musik',      'Frei',       'Wahlfach',   'Wahlfach',   'Frei',     'Frei']
+    };
+
+    const timeSlotGroups = [
+      { slots: ['08:00 – 08:45', '08:45 – 09:30'], hasBreakAfter: true },
+      { slots: ['09:45 – 10:30', '10:30 – 11:15'], hasBreakAfter: true },
+      { slots: ['11:30 – 12:15', '12:15 – 13:00'], hasBreakAfter: true },
+      { slots: ['14:00 – 14:45', '14:45 – 15:30'], hasBreakAfter: true },
+      { slots: ['15:45 – 16:30', '16:30 – 17:15'], hasBreakAfter: false }
+    ];
+
+    // ── Tasks (task 8: Spanisch) ──────────────────────────────────
+    const tasks = [
+      { id: 1,  name: 'Mathe – Übungsblatt Ableitungen',       duration: 45, deadline: 'Mittwoch',        subject: 'Mathematik' },
+      { id: 2,  name: 'Englisch – Vokabeltest',                duration: 20, deadline: 'nächster Montag', subject: 'Englisch' },
+      { id: 3,  name: 'Geschichte – Quellenanalyse',           duration: 60, deadline: 'nächster Montag', subject: 'Geschichte' },
+      { id: 4,  name: 'Physik – Experimentprotokoll',          duration: 45, deadline: 'Mittwoch',        subject: 'Physik' },
+      { id: 5,  name: 'Chemie – Reaktionsgleichungen lernen',  duration: 45, deadline: 'Dienstag',        subject: 'Chemie' },
+      { id: 6,  name: 'Deutsch – Aufsatz "Medienwelten"',      duration: 45, deadline: 'Donnerstag',      subject: 'Deutsch' },
+      { id: 7,  name: 'Biologie – Zellbiologie wiederholen',   duration: 20, deadline: 'Dienstag',        subject: 'Biologie' },
+      { id: 8,  name: 'Spanisch – Grammatikblatt',             duration: 20, deadline: 'Donnerstag',      subject: 'Spanisch' },
+      { id: 9,  name: 'Kunst – Skizze',                        duration: 20, deadline: 'Mittwoch',        subject: 'Kunst' },
+      { id: 10, name: 'Informatik – Python-Übung',             duration: 45, deadline: 'Donnerstag',      subject: 'Informatik' },
+      { id: 11, name: 'Geographie – Klimazonen',               duration: 20, deadline: 'Donnerstag',      subject: 'Geographie' },
+      { id: 12, name: 'Musik – Liedtext analysieren',          duration: 20, deadline: 'Freitag',         subject: 'Musik' },
+      { id: 13, name: 'Religion – Reflexion',                  duration: 20, deadline: 'Freitag',         subject: 'Religion' },
+      { id: 14, name: 'Sozialkunde – Politik-Dossier lesen',   duration: 45, deadline: 'Freitag',         subject: 'Sozialkunde' },
+      { id: 15, name: 'Wahlfach – Projektarbeit',              duration: 90, deadline: 'Freitag',         subject: 'Wahlfach' }
+    ];
+
+    let scheduledTasks = {};
+    let selectedTask   = null;
+
+    // ── Init ──────────────────────────────────────────────────────
+    function init() {
+      updateHeaderText();
+      renderTaskList();
+      renderTimetable();
+      setupClickHandlers();
+      updateStatusInfo();
+    }
+
+    function updateHeaderText() {
+      document.getElementById('headerInstructions').textContent = translations.headerInstructions[currentLang];
+      const hint = currentLang === 'de' ? '+ weitere Aufgabe möglich' : '+ another task fits here';
+      document.documentElement.style.setProperty('--free-slot-hint', `'${hint}'`);
+    }
+
+    // ── Language Toggle ───────────────────────────────────────────
+    function toggleLanguage() {
+      currentLang = currentLang === 'de' ? 'en' : 'de';
+      document.getElementById('langToggle').textContent = currentLang === 'de' ? 'EN' : 'DE';
+
+      document.querySelectorAll('[data-de][data-en]').forEach(el => {
+        el.textContent = el.getAttribute(`data-${currentLang}`);
+      });
+
+      document.querySelectorAll('.doc-section').forEach(s => {
+        s.style.display = s.getAttribute('data-lang') === currentLang ? 'block' : 'none';
+      });
+
+      // Update overlay if still visible
+      document.getElementById('overlayTitle').textContent = translations.overlayTitle[currentLang];
+      document.getElementById('overlayText').innerHTML   = translations.overlayText[currentLang];
+
+      updateHeaderText();
+      updateStatusInfo();
+      updateTimeUpTexts();
+      renderTaskList();
+      renderTimetable();
+      setupClickHandlers();
+    }
+
+    function toggleDocumentation() {
+      const doc = document.getElementById('documentation');
+      doc.style.display = doc.style.display === 'none' ? 'block' : 'none';
+    }
+
+    // ── Status Info ───────────────────────────────────────────────
+    function updateStatusInfo() {
+      const info = document.getElementById('statusInfo');
+      if (selectedTask) {
+        info.textContent = translations.messages.taskSelected[currentLang];
+        info.style.background = 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)';
+        info.style.color = 'white';
+      } else {
+        info.textContent = translations.messages.clickToSelect[currentLang];
+        info.style.background = 'white';
+        info.style.color = '#1a202c';
+      }
+    }
+
+    // ── Render Task List ──────────────────────────────────────────
+    function renderTaskList() {
+      const taskListEl = document.getElementById('taskList');
+      taskListEl.innerHTML = tasks.map((task, idx) => {
+        const isScheduled = Object.values(scheduledTasks).flat().some(st => st.id === task.id);
+        const isSelected  = selectedTask && selectedTask.task.id === task.id && !selectedTask.fromCell;
+        const name         = translations.taskNames[currentLang][idx];
+        const deadline     = translations.deadlines[currentLang][task.deadline];
+        const minLabel     = translations.messages.minutes[currentLang];
+        const dlLabel      = translations.messages.deadline[currentLang];
+        const schedLabel   = translations.messages.scheduled[currentLang];
+        return `
+          <div class="task-item ${isScheduled ? 'completed' : ''} ${isSelected ? 'selected' : ''}"
+               data-task-id="${task.id}" data-scheduled-text="${schedLabel}">
+            <div class="task-title">${name}</div>
+            <div class="task-meta">
+              <span class="task-duration">⏱️ ${task.duration} ${minLabel}</span>
+              <span class="task-deadline">📅 ${dlLabel}: ${deadline}</span>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    // ── Render Timetable ──────────────────────────────────────────
+    function renderTimetable() {
+      const tbody = document.getElementById('timetableBody');
+      const daysOriginal = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag'];
+      const minText = translations.messages.min[currentLang];
+      let html = '';
+      let timeSlotIndex = 0;
+
+      timeSlotGroups.forEach(group => {
+        group.slots.forEach(time => {
+          html += `<tr><th>${time}</th>` +
+            daysOriginal.map(day => {
+              const subject    = schedule[day][timeSlotIndex];
+              const translated = translations.subjects[currentLang][subject];
+              const isFree     = subject === 'Frei';
+              const cellId     = `${day}-${timeSlotIndex}`;
+              const cellTasks  = scheduledTasks[cellId] || [];
+              const isTarget   = selectedTask && isFree;
+
+              const usedMinutes  = cellTasks.reduce((sum, t) => sum + (t.displayDuration || t.duration), 0);
+              const roomForMore  = isFree && cellTasks.length > 0 && (45 - usedMinutes) >= 20;
+
+              return `<td class="${isFree ? 'free' : 'blocked'} ${isTarget ? 'drop-target' : ''} ${roomForMore ? 'has-task' : ''}"
+                          data-cell-id="${cellId}" data-day="${day}" data-time-index="${timeSlotIndex}"
+                          ${!isFree ? `data-subject="${translated}"` : ''}>
+                ${cellTasks.map(t => {
+                  const tIdx      = tasks.findIndex(x => x.id === t.id);
+                  const tName     = translations.taskNames[currentLang][tIdx];
+                  const dispDur   = t.displayDuration || t.duration;
+                  const partInfo  = t.partOf ? ` (${t.partOf})` : '';
+                  const isSel     = selectedTask && selectedTask.task.id === t.id && selectedTask.fromCell;
+                  return `<div class="scheduled-task ${isSel ? 'selected' : ''}" data-task-id="${t.id}">
+                    <button class="delete-btn" data-task-id="${t.id}">×</button>
+                    <div class="scheduled-task-title">${tName}${partInfo}</div>
+                    <div class="scheduled-task-duration">⏱️ ${dispDur} ${minText}</div>
+                  </div>`;
+                }).join('')}
+              </td>`;
+            }).join('') + `</tr>`;
+          timeSlotIndex++;
+        });
+
+        if (group.hasBreakAfter) {
+          html += `<tr class="break-row"><th></th><td></td><td></td><td></td><td></td><td></td></tr>`;
+        }
+      });
+
+      tbody.innerHTML = html;
+    }
+
+    // ── Click Handlers ────────────────────────────────────────────
+    function setupClickHandlers() {
+      document.querySelectorAll('.task-item:not(.completed)').forEach(item => {
+        item.addEventListener('click', e => {
+          e.stopPropagation();
+          const taskId = parseInt(item.dataset.taskId);
+          const task   = tasks.find(t => t.id === taskId);
+          selectedTask = (selectedTask && selectedTask.task.id === taskId && !selectedTask.fromCell)
+            ? null : { task, fromCell: null };
+          updateStatusInfo(); renderTaskList(); renderTimetable(); setupClickHandlers();
+        });
+      });
+
+      document.querySelectorAll('.scheduled-task').forEach(st => {
+        st.addEventListener('click', e => {
+          e.stopPropagation();
+          const taskId  = parseInt(st.dataset.taskId);
+          const taskObj = tasks.find(t => t.id === taskId);
+          const cellId  = st.closest('td').dataset.cellId;
+
+          if (selectedTask && selectedTask.task.id === taskId && selectedTask.fromCell === cellId) {
+            selectedTask = null;
+          } else {
+            Object.keys(scheduledTasks).forEach(cId => {
+              scheduledTasks[cId] = scheduledTasks[cId].filter(t => t.id !== taskId);
+              if (!scheduledTasks[cId].length) delete scheduledTasks[cId];
+            });
+            selectedTask = { task: taskObj, fromCell: cellId };
+          }
+          updateStatusInfo(); renderTaskList(); renderTimetable(); setupClickHandlers();
+        });
+      });
+
+      document.querySelectorAll('.delete-btn').forEach(btn => {
+        btn.addEventListener('click', e => { e.stopPropagation(); removeTask(parseInt(btn.dataset.taskId)); });
+      });
+
+      document.querySelectorAll('td.free').forEach(cell => {
+        cell.addEventListener('click', e => { e.stopPropagation(); if (selectedTask) placeTaskOnCell(cell); });
+      });
+
+      document.addEventListener('click', e => {
+        if (!e.target.closest('.task-item') && !e.target.closest('.scheduled-task') && !e.target.closest('td.free')) {
+          if (selectedTask && selectedTask.fromCell) {
+            renderTaskList(); renderTimetable(); setupClickHandlers();
+          }
+          selectedTask = null;
+          updateStatusInfo(); renderTaskList(); renderTimetable(); setupClickHandlers();
+        }
+      }, { once: false });
+    }
+
+    // ── Place Task ────────────────────────────────────────────────
+    function placeTaskOnCell(cell) {
+      const cellId  = cell.dataset.cellId;
+      const [day, timeIdxStr] = cellId.split('-');
+      const timeIdx = parseInt(timeIdxStr);
+      const requiredSlots = Math.ceil(selectedTask.task.duration / 45);
+      const slotsToUse    = [];
+
+      for (let i = 0; i < requiredSlots; i++) {
+        const nextIdx    = timeIdx + i;
+        const nextCellId = `${day}-${nextIdx}`;
+        if (nextIdx < 10 && schedule[day][nextIdx] === 'Frei') {
+          // How many minutes are already used in this slot?
+          const usedMinutes = (scheduledTasks[nextCellId] || [])
+            .reduce((sum, t) => sum + (t.displayDuration || t.duration), 0);
+          const freeMinutes = 45 - usedMinutes;
+          // How many minutes does this task need in this specific slot?
+          const alreadyPlanned = i * 45;
+          const stillNeeded    = selectedTask.task.duration - alreadyPlanned;
+          const needInSlot     = Math.min(stillNeeded, 45);
+
+          if (freeMinutes < needInSlot) {
+            alert(translations.messages.notEnoughSlots[currentLang]);
+            return;
+          }
+          slotsToUse.push(nextCellId);
+        } else {
+          alert(translations.messages.notEnoughSlots[currentLang]);
+          return;
+        }
+      }
+
+      let remaining = selectedTask.task.duration;
+      slotsToUse.forEach((slotId, idx) => {
+        if (!scheduledTasks[slotId]) scheduledTasks[slotId] = [];
+        const usedInSlot = scheduledTasks[slotId].reduce((s, t) => s + (t.displayDuration || t.duration), 0);
+        const freeInSlot = 45 - usedInSlot;
+        const slotDur    = Math.min(freeInSlot, remaining);
+        remaining -= slotDur;
+        scheduledTasks[slotId].push({
+          ...selectedTask.task,
+          displayDuration: slotDur,
+          partOf: slotsToUse.length > 1 ? `${idx + 1}/${slotsToUse.length}` : null
+        });
+      });
+
+      selectedTask = null;
+      updateStatusInfo(); renderTaskList(); renderTimetable(); setupClickHandlers();
+    }
+
+    // ── Remove Task ───────────────────────────────────────────────
+    function removeTask(taskId) {
+      Object.keys(scheduledTasks).forEach(cId => {
+        scheduledTasks[cId] = scheduledTasks[cId].filter(t => t.id !== taskId);
+        if (!scheduledTasks[cId].length) delete scheduledTasks[cId];
+      });
+      if (selectedTask && selectedTask.task.id === taskId) selectedTask = null;
+      updateStatusInfo(); renderTaskList(); renderTimetable(); setupClickHandlers();
+    }
+
+    // ── Timer ─────────────────────────────────────────────────────
+    const TIMER_DURATION = 8 * 60; // 8 minutes in seconds
+    let timerRemaining = TIMER_DURATION;
+    let timerInterval  = null;
+    const CIRCUMFERENCE = 2 * Math.PI * 20; // r=20 → ≈ 125.66
+
+    function startTimer() {
+      if (timerInterval) return; // already running
+      timerInterval = setInterval(() => {
+        timerRemaining--;
+        updateTimerDisplay();
+        if (timerRemaining <= 0) {
+          clearInterval(timerInterval);
+          timerInterval = null;
+          showTimeUp();
+        }
+      }, 1000);
+      updateTimerDisplay();
+    }
+
+    function updateTimerDisplay() {
+      const mins = Math.floor(timerRemaining / 60);
+      const secs = timerRemaining % 60;
+      const display = `${String(mins).padStart(2,'0')}:${String(secs).padStart(2,'0')}`;
+
+      document.getElementById('timerDisplay').textContent = display;
+      document.getElementById('timerRingText').textContent = mins;
+
+      // Ring progress
+      const progress  = timerRemaining / TIMER_DURATION;
+      const offset    = CIRCUMFERENCE * (1 - progress);
+      document.getElementById('timerRingBar').style.strokeDashoffset = offset;
+
+      // Color states
+      const widget = document.getElementById('timerWidget');
+      widget.classList.remove('warning', 'danger', 'finished');
+      if (timerRemaining <= 0) {
+        widget.classList.add('finished');
+      } else if (timerRemaining <= 60) {
+        widget.classList.add('danger');
+      } else if (timerRemaining <= 2 * 60) {
+        widget.classList.add('warning');
+      }
+    }
+
+    function showTimeUp() {
+      const overlay = document.getElementById('timeUpOverlay');
+      overlay.classList.add('visible');
+      const widget = document.getElementById('timerWidget');
+      widget.classList.add('finished');
+      document.getElementById('timerDisplay').textContent = '00:00';
+      document.getElementById('timerRingText').textContent = '0';
+      document.getElementById('timerRingBar').style.strokeDashoffset = CIRCUMFERENCE;
+    }
+
+    function dismissTimeUp() {
+      document.getElementById('timeUpOverlay').classList.remove('visible');
+    }
+
+    function updateTimeUpTexts() {
+      const texts = {
+        title: { de: 'Zeit abgelaufen!',                              en: 'Time is up!' },
+        body:  { de: 'Die 8 Minuten sind um. Bitte legen Sie Ihren Stift nieder.', en: 'The 8 minutes are over. Please put down your pen.' }
+      };
+      document.getElementById('timeUpTitle').textContent = texts.title[currentLang];
+      document.getElementById('timeUpText').textContent  = texts.body[currentLang];
+    }
+
+    init();
+  </script>
+</body>
+</html>
