@@ -43,11 +43,11 @@
     .start-card {
       background: rgba(255, 255, 255, 0.95);
       border-radius: 28px;
-      padding: 56px 64px;
+      padding: 40px 48px;
       text-align: center;
       box-shadow: 0 32px 80px rgba(0,0,0,0.35);
-      max-width: 520px;
-      width: 90%;
+      max-width: 680px;
+      width: 92%;
       animation: cardIn 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
     }
 
@@ -70,10 +70,11 @@
     }
 
     .start-card p {
-      font-size: 1rem;
-      color: #718096;
-      line-height: 1.7;
-      margin-bottom: 36px;
+      font-size: 0.95rem;
+      color: #4a5568;
+      line-height: 1.75;
+      margin-bottom: 20px;
+      text-align: left;
     }
 
     #startBtn {
@@ -573,6 +574,7 @@
     }
     #dismissBtn:hover { transform: translateY(-2px); box-shadow: 0 12px 28px rgba(102,126,234,0.55); }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
 </head>
 <body>
 
@@ -581,6 +583,31 @@
   ============================================================ -->
   <div id="startOverlay">
     <div class="start-card">
+      <!-- Language toggle on overlay -->
+      <div style="display:flex; justify-content:flex-end; margin-bottom:24px;">
+        <button id="overlayLangBtn" onclick="toggleLanguage()" style="padding:10px 20px; font-size:0.95rem;">
+          🌐 <span id="langToggle">EN</span>
+        </button>
+      </div>
+
+      <span class="icon">🎓</span>
+      <h2 id="overlayTitle">Stundenplan-Planer</h2>
+      <p id="overlayText"></p>
+
+      <!-- How-to hint -->
+      <div id="overlayHint" style="
+        background: #eef2ff;
+        border: 2px solid #c7d2fe;
+        border-radius: 14px;
+        padding: 16px 20px;
+        margin-bottom: 32px;
+        text-align: left;
+        font-size: 0.9rem;
+        color: #3730a3;
+        font-weight: 500;
+        line-height: 1.7;
+      "></div>
+
       <button id="startBtn" onclick="startApp()">▶ Start</button>
     </div>
   </div>
@@ -607,10 +634,7 @@
     </header>
 
     <div class="controls">
-      <button class="secondary" onclick="toggleLanguage()">🌐 <span id="langToggle">EN</span></button>
-      <div class="info" id="statusInfo"><span data-de="1️⃣ Aufgabe anklicken → 2️⃣ Freies Feld anklicken" data-en="1️⃣ Click task → 2️⃣ Click free field"></span></div>
-
-      <!-- TIMER -->
+      <!-- TIMER only -->
       <div id="timerWidget">
         <div class="timer-ring-wrap">
           <svg width="48" height="48" viewBox="0 0 48 48">
@@ -622,6 +646,12 @@
         </div>
         <span id="timerDisplay">08:00</span>
       </div>
+
+      <div class="info" id="statusInfo"></div>
+
+      <button class="secondary" onclick="exportToExcel()" id="exportBtn" style="background: linear-gradient(135deg, #38a169 0%, #276749 100%);">
+        📊 <span data-de="Export Excel" data-en="Export Excel">Export Excel</span>
+      </button>
     </div>
 
     <div class="documentation" id="documentation" style="display: none;">
@@ -719,10 +749,13 @@
         en: 'Timetable Planner'
       },
       overlayText: {
-        de: 'Sie erhalten 15 Hausaufgaben, jeweils mit Abgabefrist zur nächsten Unterrichtsstunde.<br><br>Verteilen Sie Ihre Hausaufgaben auf die freien Slots im Stundenplan – klicken Sie auf <strong>Start</strong>, um zu beginnen.',
-        en: 'You will receive 15 homework assignments, each with a deadline for the next class.<br><br>Distribute your homework across the free slots in the timetable – click <strong>Start</strong> to begin.'
+        de: 'Sie erhalten 15 Hausaufgaben, jeweils mit Abgabefrist zur nächsten Unterrichtsstunde. Hausaufgaben dürfen nur in den Stunden mit Kennzeichnung „frei" erledigt werden. In einem freien Slot können mehrere Hausaufgaben erledigt werden, sofern die Zeit ausreicht. Die Bearbeitungszeit einer Aufgabe darf nicht aufgeteilt werden.',
+        en: 'You will receive 15 homework assignments, each with a deadline for the next class. Homework may only be completed during lessons marked as "free." Several homework assignments can be completed in a free slot, provided there is enough time. The processing time for a task may not be split up.'
       },
-      startBtn: { de: '▶ Start', en: '▶ Start' },
+      overlayHint: {
+        de: '1️⃣ Aufgabe in der linken Liste anklicken\n2️⃣ Grünes „Frei"-Feld im Stundenplan anklicken\n✅ Aufgabe wird automatisch eingeplant',
+        en: '1️⃣ Click a task in the left list\n2️⃣ Click a green "Free" field in the timetable\n✅ The task is automatically scheduled'
+      },
       days: {
         de: ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag'],
         en: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday']
@@ -845,6 +878,7 @@
 
     // ── Init ──────────────────────────────────────────────────────
     function init() {
+      updateOverlay();
       updateHeaderText();
       renderTaskList();
       renderTimetable();
@@ -858,23 +892,28 @@
       document.documentElement.style.setProperty('--free-slot-hint', `'${hint}'`);
     }
 
+    function updateOverlay() {
+      document.getElementById('overlayTitle').textContent = translations.overlayTitle[currentLang];
+      document.getElementById('overlayText').textContent  = translations.overlayText[currentLang];
+      // Hint lines with line breaks
+      const hintEl = document.getElementById('overlayHint');
+      hintEl.innerHTML = translations.overlayHint[currentLang]
+        .split('\n').map(l => `<div>${l}</div>`).join('');
+      document.getElementById('langToggle').textContent = currentLang === 'de' ? 'EN' : 'DE';
+    }
+
     // ── Language Toggle ───────────────────────────────────────────
     function toggleLanguage() {
       currentLang = currentLang === 'de' ? 'en' : 'de';
-      document.getElementById('langToggle').textContent = currentLang === 'de' ? 'EN' : 'DE';
 
       document.querySelectorAll('[data-de][data-en]').forEach(el => {
         el.textContent = el.getAttribute(`data-${currentLang}`);
       });
-
       document.querySelectorAll('.doc-section').forEach(s => {
         s.style.display = s.getAttribute('data-lang') === currentLang ? 'block' : 'none';
       });
 
-      // Update overlay if still visible
-      document.getElementById('overlayTitle').textContent = translations.overlayTitle[currentLang];
-      document.getElementById('overlayText').innerHTML   = translations.overlayText[currentLang];
-
+      updateOverlay();
       updateHeaderText();
       updateStatusInfo();
       updateTimeUpTexts();
@@ -1153,6 +1192,137 @@
       };
       document.getElementById('timeUpTitle').textContent = texts.title[currentLang];
       document.getElementById('timeUpText').textContent  = texts.body[currentLang];
+    }
+
+    // ── Export to Excel ───────────────────────────────────────────
+    function exportToExcel() {
+      const wb = XLSX.utils.book_new();
+      const daysOriginal = ['Montag', 'Dienstag', 'Mittwoch', 'Donnerstag', 'Freitag'];
+
+      // ── Sheet 1: Stundenplan-Übersicht (Kalenderansicht) ─────────
+      const timeLabels = [];
+      timeSlotGroups.forEach(g => g.slots.forEach(s => timeLabels.push(s)));
+
+      const calHeader = [
+        currentLang === 'de' ? 'Zeit' : 'Time',
+        ...daysOriginal.map(d => translations.days[currentLang][daysOriginal.indexOf(d)])
+      ];
+
+      const calRows = [calHeader];
+      timeLabels.forEach((time, idx) => {
+        const row = [time];
+        daysOriginal.forEach(day => {
+          const subject = schedule[day][idx];
+          if (subject === 'Frei') {
+            const cellId   = `${day}-${idx}`;
+            const cellTask = (scheduledTasks[cellId] || []);
+            if (cellTask.length === 0) {
+              row.push(currentLang === 'de' ? 'frei' : 'free');
+            } else {
+              const names = cellTask.map(t => {
+                const tIdx = tasks.findIndex(x => x.id === t.id);
+                return `${translations.taskNames[currentLang][tIdx]} (${t.displayDuration || t.duration} ${translations.messages.min[currentLang]})`;
+              });
+              row.push(names.join(' | '));
+            }
+          } else {
+            row.push(translations.subjects[currentLang][subject]);
+          }
+        });
+        calRows.push(row);
+      });
+
+      const ws1 = XLSX.utils.aoa_to_sheet(calRows);
+
+      // Column widths
+      ws1['!cols'] = [{ wch: 18 }, { wch: 30 }, { wch: 30 }, { wch: 30 }, { wch: 30 }, { wch: 30 }];
+
+      XLSX.utils.book_append_sheet(wb, ws1, currentLang === 'de' ? 'Stundenplan' : 'Timetable');
+
+      // ── Sheet 2: Aufgabenliste mit Planungsstatus ─────────────────
+      const taskHeader = currentLang === 'de'
+        ? ['#', 'Aufgabe', 'Dauer (Min)', 'Deadline', 'Eingeplant', 'Tag', 'Zeitslot']
+        : ['#', 'Task', 'Duration (min)', 'Deadline', 'Scheduled', 'Day', 'Time slot'];
+
+      const taskRows = [taskHeader];
+      tasks.forEach((task, idx) => {
+        const name     = translations.taskNames[currentLang][idx];
+        const deadline = translations.deadlines[currentLang][task.deadline];
+        const scheduledIn = [];
+
+        daysOriginal.forEach(day => {
+          timeLabels.forEach((time, tIdx) => {
+            const cellId = `${day}-${tIdx}`;
+            (scheduledTasks[cellId] || []).forEach(st => {
+              if (st.id === task.id) {
+                scheduledIn.push({
+                  day: translations.days[currentLang][daysOriginal.indexOf(day)],
+                  time
+                });
+              }
+            });
+          });
+        });
+
+        if (scheduledIn.length === 0) {
+          taskRows.push([
+            idx + 1, name, task.duration, deadline,
+            currentLang === 'de' ? 'Nein' : 'No', '–', '–'
+          ]);
+        } else {
+          scheduledIn.forEach((slot, sIdx) => {
+            taskRows.push([
+              sIdx === 0 ? idx + 1 : '',
+              sIdx === 0 ? name : '',
+              sIdx === 0 ? task.duration : '',
+              sIdx === 0 ? deadline : '',
+              currentLang === 'de' ? 'Ja' : 'Yes',
+              slot.day,
+              slot.time
+            ]);
+          });
+        }
+      });
+
+      const ws2 = XLSX.utils.aoa_to_sheet(taskRows);
+      ws2['!cols'] = [
+        { wch: 4 }, { wch: 36 }, { wch: 14 }, { wch: 18 }, { wch: 12 }, { wch: 14 }, { wch: 18 }
+      ];
+      XLSX.utils.book_append_sheet(wb, ws2, currentLang === 'de' ? 'Aufgabenliste' : 'Task list');
+
+      // ── Sheet 3: Zusammenfassung ──────────────────────────────────
+      const total     = tasks.length;
+      const scheduled = tasks.filter(t =>
+        Object.values(scheduledTasks).flat().some(st => st.id === t.id)
+      ).length;
+      const unscheduled = total - scheduled;
+      const totalMinScheduled = tasks
+        .filter(t => Object.values(scheduledTasks).flat().some(st => st.id === t.id))
+        .reduce((s, t) => s + t.duration, 0);
+
+      const summaryRows = currentLang === 'de' ? [
+        ['Zusammenfassung', ''],
+        ['Gesamtaufgaben', total],
+        ['Eingeplant', scheduled],
+        ['Nicht eingeplant', unscheduled],
+        ['Eingeplante Zeit gesamt (Min)', totalMinScheduled],
+        ['Export-Zeitpunkt', new Date().toLocaleString('de-DE')],
+      ] : [
+        ['Summary', ''],
+        ['Total tasks', total],
+        ['Scheduled', scheduled],
+        ['Not scheduled', unscheduled],
+        ['Total scheduled time (min)', totalMinScheduled],
+        ['Export timestamp', new Date().toLocaleString('en-GB')],
+      ];
+
+      const ws3 = XLSX.utils.aoa_to_sheet(summaryRows);
+      ws3['!cols'] = [{ wch: 32 }, { wch: 20 }];
+      XLSX.utils.book_append_sheet(wb, ws3, currentLang === 'de' ? 'Zusammenfassung' : 'Summary');
+
+      // ── Download ──────────────────────────────────────────────────
+      const filename = `Stundenplan_Export_${new Date().toISOString().slice(0,10)}.xlsx`;
+      XLSX.writeFile(wb, filename);
     }
 
     init();
