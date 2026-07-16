@@ -619,7 +619,7 @@
     <div class="time-up-card">
       <span class="icon">⏰</span>
       <h2 id="timeUpTitle">Zeit abgelaufen!</h2>
-      <p id="timeUpText">Die 8 Minuten sind um. Bitte legen Sie Ihren Stift nieder.</p>
+      <p id="timeUpText">Die 6:30 Minuten sind um. Bitte legen Sie Ihren Stift nieder.</p>
       <button id="dismissBtn" onclick="dismissTimeUp()">OK</button>
     </div>
   </div>
@@ -642,9 +642,9 @@
             <circle class="timer-ring-bar" id="timerRingBar" cx="24" cy="24" r="20"
                     stroke-dasharray="125.66" stroke-dashoffset="0"/>
           </svg>
-          <div class="timer-ring-text" id="timerRingText">8</div>
+          <div class="timer-ring-text" id="timerRingText">6</div>
         </div>
-        <span id="timerDisplay">08:00</span>
+        <span id="timerDisplay">06:30</span>
       </div>
 
       <div class="info" id="statusInfo"></div>
@@ -1127,7 +1127,7 @@
     }
 
     // ── Timer ─────────────────────────────────────────────────────
-    const TIMER_DURATION = 8 * 60; // 8 minutes in seconds
+    const TIMER_DURATION = 6 * 60 + 30; // 6:30 minutes in seconds
     let timerRemaining = TIMER_DURATION;
     let timerInterval  = null;
     const CIRCUMFERENCE = 2 * Math.PI * 20; // r=20 → ≈ 125.66
@@ -1188,7 +1188,7 @@
     function updateTimeUpTexts() {
       const texts = {
         title: { de: 'Zeit abgelaufen!',                              en: 'Time is up!' },
-        body:  { de: 'Die 8 Minuten sind um. Bitte legen Sie Ihren Stift nieder.', en: 'The 8 minutes are over. Please put down your pen.' }
+        body:  { de: 'Die 6:30 Minuten sind um. Bitte legen Sie Ihren Stift nieder.', en: 'The 6:30 minutes are over. Please put down your pen.' }
       };
       document.getElementById('timeUpTitle').textContent = texts.title[currentLang];
       document.getElementById('timeUpText').textContent  = texts.body[currentLang];
